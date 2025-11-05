@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SantagaTrackHub Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <style>
+        * {
+            --color-primary: #2563eb;
+            --color-secondary: #64748b;
+            --color-surface: #ffffff;
+            --color-background: #f8fafc;
+            --color-border: #e2e8f0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--color-background);
+            color: #1e293b;
+        }
+
+        .page-content {
+            display: none;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .page-content.active {
+            display: block;
+            opacity: 1;
+        }
+
+        .nav-link {
+            transition: all 0.2s ease;
+            border-radius: 8px;
+            color: #94a3b8;
+        }
+
+        .nav-link:hover {
+            color: var(--color-primary);
+            background-color: rgba(37, 99, 235, 0.05);
+        }
+
+        .nav-link.active {
+            color: var(--color-primary);
+            background-color: rgba(37, 99, 235, 0.1);
+            font-weight: 500;
+        }
+
+        .stat-card {
+            transition: all 0.3s ease;
+            border-radius: 12px;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        .custom-marker {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        .leaflet-popup-content-wrapper {
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .table-row {
+            transition: background-color 0.2s ease;
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        .table-row:hover {
+            background-color: rgba(37, 99, 235, 0.02);
+        }
+
+        .badge {
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            padding: 4px 10px;
+        }
+
+        .badge-active {
+            background-color: rgba(16, 185, 129, 0.1);
+            color: #059669;
+        }
+
+        .badge-idle {
+            background-color: rgba(251, 191, 36, 0.1);
+            color: #d97706;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50">
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-white border-r border-slate-200 flex flex-col">
+            <!-- Logo -->
+            <div class="px-6 py-8 border-b border-slate-200">
+                <div class="flex items-center gap-3">
+                    <div
+                        class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-map-pin text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-lg font-semibold text-slate-900">SantagaHub</h1>
+                        <p class="text-xs text-slate-500">Santiago Tracking</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navigation -->
+            <nav class="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+                <button onclick="showPage('dashboard')"
+                    class="nav-link active w-full text-left flex items-center gap-3 px-4 py-3">
+                    <i class="fas fa-chart-line w-5"></i>
+                    <span>Dashboard</span>
+                </button>
+                <button onclick="showPage('vehicles')"
+                    class="nav-link w-full text-left flex items-center gap-3 px-4 py-3">
+                    <i class="fas fa-truck w-5"></i>
+                    <span>Vehicles</span>
+                </button>
+                <button onclick="showPage('health')"
+                    class="nav-link w-full text-left flex items-center gap-3 px-4 py-3">
+                    <i class="fas fa-heartbeat w-5"></i>
+                    <span>Health</span>
+                </button>
+                <button onclick="showPage('qr')" class="nav-link w-full text-left flex items-center gap-3 px-4 py-3">
+                    <i class="fas fa-qrcode w-5"></i>
+                    <span>QR Codes</span>
+                </button>
+                <button onclick="showPage('users')" class="nav-link w-full text-left flex items-center gap-3 px-4 py-3">
+                    <i class="fas fa-users w-5"></i>
+                    <span>Users</span>
+                </button>
+                <button onclick="showPage('settings')"
+                    class="nav-link w-full text-left flex items-center gap-3 px-4 py-3">
+                    <i class="fas fa-sliders-h w-5"></i>
+                    <span>Settings</span>
+                </button>
+            </nav>
+
+            <!-- Footer -->
+            <div class="px-4 py-4 border-t border-slate-200">
+                <button onclick="logout()"
+                    class="w-full flex items-center gap-3 px-4 py-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition">
+                    <i class="fas fa-sign-out-alt w-5"></i>
+                    <span class="text-sm font-medium">Logout</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col overflow-hidden">
+            <!-- Header -->
+            <header class="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between">
+                <div>
+                    <!-- <h2 id="page-title" class="text-2xl font-semibold text-slate-900"></h2>
+                    <p class="text-sm text-slate-500 mt-1"></p> -->
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="relative hidden sm:block">
+                        <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400"></i>
+                        <input type="text" placeholder="Search..."
+                            class="pl-10 pr-4 py-2 bg-slate-100 border border-transparent rounded-lg focus:outline-none focus:bg-white focus:border-slate-200 w-56">
+                    </div>
+                    <button class="relative p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition">
+                        <i class="fas fa-bell"></i>
+                        <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                    </button>
+                    <div class="flex items-center gap-3">
+                        <div id="user-initials"
+                            class="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center text-white font-semibold">
+                        </div>
+                        <div class="text-sm text-right hidden sm:block">
+                            <p id="user-name" class="font-semibold text-slate-900">Loading...</p>
+                            <p id="user-role" class="text-xs text-slate-500">Loading...</p>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Content -->
+            <div class="flex-1 overflow-auto">
+                <!-- DASHBOARD PAGE -->
+                <div id="dashboard" class="page-content active p-8">
+                    <!-- Stats Grid -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                        <div class="stat-card bg-white rounded-xl p-6 border border-slate-200">
+                            <div class="flex items-start justify-between">
+                                <div>
+                                    <p class="text-sm text-slate-600 font-medium">Active Vehicles</p>
+                                    <p class="text-3xl font-semibold text-slate-900 mt-2">12</p>
+                                    <p class="text-xs text-emerald-600 mt-2">↑ 3 on missions</p>
+                                </div>
+                                <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-truck text-blue-600"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="stat-card bg-white rounded-xl p-6 border border-slate-200">
+                            <div class="flex items-start justify-between">
+                                <div>
+                                    <p class="text-sm text-slate-600 font-medium">Total Patients</p>
+                                    <p class="text-3xl font-semibold text-slate-900 mt-2">1,240</p>
+                                    <p class="text-xs text-emerald-600 mt-2">↑ 28 this month</p>
+                                </div>
+                                <div class="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-users text-emerald-600"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="stat-card bg-white rounded-xl p-6 border border-slate-200">
+                            <div class="flex items-start justify-between">
+                                <div>
+                                    <p class="text-sm text-slate-600 font-medium">Vaccinations</p>
+                                    <p class="text-3xl font-semibold text-slate-900 mt-2">892</p>
+                                    <p class="text-xs text-emerald-600 mt-2">↑ 45 completed</p>
+                                </div>
+                                <div class="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-syringe text-amber-600"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="stat-card bg-white rounded-xl p-6 border border-slate-200">
+                            <div class="flex items-start justify-between">
+                                <div>
+                                    <p class="text-sm text-slate-600 font-medium">System Status</p>
+                                    <p class="text-3xl font-semibold text-slate-900 mt-2">99.8%</p>
+                                    <p class="text-xs text-emerald-600 mt-2">✓ Operational</p>
+                                </div>
+                                <div class="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-check-circle text-slate-600"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Map & List -->
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                        <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 overflow-hidden">
+                            <div class="p-6 border-b border-slate-200">
+                                <h3 class="font-semibold text-slate-900">Live Tracking</h3>
+                            </div>
+                            <div id="dashboard-map" style="height: 350px; z-index: 1;"></div>
+                        </div>
+
+                        <div class="bg-white rounded-xl border border-slate-200 overflow-hidden flex flex-col">
+                            <div class="p-6 border-b border-slate-200">
+                                <h3 class="font-semibold text-slate-900">Vehicles</h3>
+                            </div>
+                            <div class="flex-1 overflow-y-auto">
+                                <div class="divide-y divide-slate-200">
+                                    <div class="p-4 hover:bg-slate-50 transition cursor-pointer">
+                                        <p class="font-medium text-slate-900 text-sm">Vehicle #001</p>
+                                        <p class="text-xs text-slate-500 mt-1">Juan Dela Cruz</p>
+                                        <span class="badge badge-active mt-2 inline-block">Active</span>
+                                    </div>
+                                    <div class="p-4 hover:bg-slate-50 transition cursor-pointer">
+                                        <p class="font-medium text-slate-900 text-sm">Vehicle #002</p>
+                                        <p class="text-xs text-slate-500 mt-1">Maria Santos</p>
+                                        <span class="badge badge-active mt-2 inline-block">Active</span>
+                                    </div>
+                                    <div class="p-4 hover:bg-slate-50 transition cursor-pointer">
+                                        <p class="font-medium text-slate-900 text-sm">Vehicle #003</p>
+                                        <p class="text-xs text-slate-500 mt-1">Pedro Reyes</p>
+                                        <span class="badge badge-idle mt-2 inline-block">Idle</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Activity & Patients -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                            <div class="p-6 border-b border-slate-200">
+                                <h3 class="font-semibold text-slate-900">Recent Activity</h3>
+                            </div>
+                            <div class="divide-y divide-slate-200 max-h-64 overflow-y-auto">
+                                <div class="p-4 hover:bg-slate-50 transition">
+                                    <p class="text-sm font-medium text-slate-900">Vehicle Check-out</p>
+                                    <p class="text-xs text-slate-500 mt-1">Vehicle #005 - Juan Dela Cruz</p>
+                                    <p class="text-xs text-slate-400 mt-2">2 minutes ago</p>
+                                </div>
+                                <div class="p-4 hover:bg-slate-50 transition">
+                                    <p class="text-sm font-medium text-slate-900">Patient Registered</p>
+                                    <p class="text-xs text-slate-500 mt-1">Maria Gonzales - New record</p>
+                                    <p class="text-xs text-slate-400 mt-2">15 minutes ago</p>
+                                </div>
+                                <div class="p-4 hover:bg-slate-50 transition">
+                                    <p class="text-sm font-medium text-slate-900">Vaccination Completed</p>
+                                    <p class="text-xs text-slate-500 mt-1">Carlos Reyes - COVID-19 Booster</p>
+                                    <p class="text-xs text-slate-400 mt-2">32 minutes ago</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                            <div class="p-6 border-b border-slate-200">
+                                <h3 class="font-semibold text-slate-900">Recent Patients</h3>
+                            </div>
+                            <div class="divide-y divide-slate-200 max-h-64 overflow-y-auto">
+                                <div class="p-4 hover:bg-slate-50 transition cursor-pointer">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <p class="text-sm font-medium text-slate-900">Anna Reyes</p>
+                                            <p class="text-xs text-slate-500 mt-1">Age: 35 | ID: PAT-001</p>
+                                        </div>
+                                        <i class="fas fa-qrcode text-slate-400"></i>
+                                    </div>
+                                </div>
+                                <div class="p-4 hover:bg-slate-50 transition cursor-pointer">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <p class="text-sm font-medium text-slate-900">Juan Dela Cruz</p>
+                                            <p class="text-xs text-slate-500 mt-1">Age: 42 | ID: PAT-002</p>
+                                        </div>
+                                        <i class="fas fa-qrcode text-slate-400"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VEHICLES PAGE -->
+                <div id="vehicles" class="page-content p-8">
+                    <div class="mb-6 flex justify-between items-center">
+                        <div>
+                            <h2 class="text-2xl font-semibold text-slate-900">Vehicle Management</h2>
+                            <p class="text-sm text-slate-500 mt-1">Monitor and manage all vehicles</p>
+                        </div>
+                        <button
+                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium">+
+                            Add Vehicle</button>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 overflow-hidden">
+                            <div class="p-6 border-b border-slate-200">
+                                <h3 class="font-semibold text-slate-900">Live Map</h3>
+                            </div>
+                            <div id="vehicle-map" style="height: 400px; z-index: 1;"></div>
+                        </div>
+
+                        <div class="bg-white rounded-xl border border-slate-200 overflow-hidden flex flex-col">
+                            <div class="p-6 border-b border-slate-200">
+                                <h3 class="font-semibold text-slate-900">All Vehicles</h3>
+                            </div>
+                            <div class="flex-1 overflow-y-auto">
+                                <div class="divide-y divide-slate-200">
+                                    <div class="p-4 hover:bg-slate-50 transition cursor-pointer">
+                                        <div class="flex items-start justify-between">
+                                            <div>
+                                                <p class="font-medium text-slate-900 text-sm">Vehicle #001</p>
+                                                <p class="text-xs text-slate-500 mt-1">Driver: Juan Dela Cruz</p>
+                                            </div>
+                                            <span class="badge badge-active">Active</span>
+                                        </div>
+                                    </div>
+                                    <div class="p-4 hover:bg-slate-50 transition cursor-pointer">
+                                        <div class="flex items-start justify-between">
+                                            <div>
+                                                <p class="font-medium text-slate-900 text-sm">Vehicle #002</p>
+                                                <p class="text-xs text-slate-500 mt-1">Driver: Maria Santos</p>
+                                            </div>
+                                            <span class="badge badge-active">Active</span>
+                                        </div>
+                                    </div>
+                                    <div class="p-4 hover:bg-slate-50 transition cursor-pointer">
+                                        <div class="flex items-start justify-between">
+                                            <div>
+                                                <p class="font-medium text-slate-900 text-sm">Vehicle #003</p>
+                                                <p class="text-xs text-slate-500 mt-1">Driver: Pedro Reyes</p>
+                                            </div>
+                                            <span class="badge badge-idle">Idle</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- HEALTH PAGE -->
+                <div id="health" class="page-content p-8">
+                    <div class="mb-6 flex justify-between items-center">
+                        <div>
+                            <h2 class="text-2xl font-semibold text-slate-900">Health Records</h2>
+                            <p class="text-sm text-slate-500 mt-1">Patient and vaccination management</p>
+                        </div>
+                        <button
+                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium">+
+                            Add Patient</button>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 overflow-hidden">
+                            <div class="p-6 border-b border-slate-200">
+                                <h3 class="font-semibold text-slate-900">Patient Records</h3>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full">
+                                    <thead class="bg-slate-50 border-b border-slate-200">
+                                        <tr>
+                                            <th class="px-6 py-3 text-left text-xs font-semibold text-slate-600">Name
+                                            </th>
+                                            <th class="px-6 py-3 text-left text-xs font-semibold text-slate-600">Age
+                                            </th>
+                                            <th class="px-6 py-3 text-left text-xs font-semibold text-slate-600">Status
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr class="table-row">
+                                            <td class="px-6 py-4 text-sm text-slate-900">Anna Reyes</td>
+                                            <td class="px-6 py-4 text-sm text-slate-600">35</td>
+                                            <td class="px-6 py-4"><span class="badge badge-active">Active</span></td>
+                                        </tr>
+                                        <tr class="table-row">
+                                            <td class="px-6 py-4 text-sm text-slate-900">Juan Dela Cruz</td>
+                                            <td class="px-6 py-4 text-sm text-slate-600">42</td>
+                                            <td class="px-6 py-4"><span class="badge badge-active">Active</span></td>
+                                        </tr>
+                                        <tr class="table-row">
+                                            <td class="px-6 py-4 text-sm text-slate-900">Maria Santos</td>
+                                            <td class="px-6 py-4 text-sm text-slate-600">28</td>
+                                            <td class="px-6 py-4"><span class="badge badge-idle">Archived</span></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-xl border border-slate-200 p-6">
+                            <h3 class="font-semibold text-slate-900 mb-4">Vaccination Stats</h3>
+                            <div class="space-y-3">
+                                <div class="p-3 bg-blue-50 rounded-lg">
+                                    <p class="text-xs text-slate-600 font-medium">COVID-19</p>
+                                    <p class="text-lg font-semibold text-blue-600 mt-1">856</p>
+                                </div>
+                                <div class="p-3 bg-emerald-50 rounded-lg">
+                                    <p class="text-xs text-slate-600 font-medium">Flu Shot</p>
+                                    <p class="text-lg font-semibold text-emerald-600 mt-1">234</p>
+                                </div>
+                                <div class="p-3 bg-amber-50 rounded-lg">
+                                    <p class="text-xs text-slate-600 font-medium">Polio Vaccine</p>
+                                    <p class="text-lg font-semibold text-amber-600 mt-1">892</p>
+                                </div>
+                                <div class="p-3 bg-slate-100 rounded-lg">
+                                    <p class="text-xs text-slate-600 font-medium">Pending</p>
+                                    <p class="text-lg font-semibold text-slate-600 mt-1">12</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- QR PAGE -->
+                <div id="qr" class="page-content p-8">
+                    <div class="mb-6">
+                        <h2 class="text-2xl font-semibold text-slate-900">QR Code Management</h2>
+                        <p class="text-sm text-slate-500 mt-1">Generate and manage QR codes</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="bg-white rounded-xl border border-slate-200 p-6">
+                            <h3 class="font-semibold text-slate-900 mb-4">Generate QR</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">Select Patient</label>
+                                    <select
+                                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                                        <option>Anna Reyes</option>
+                                        <option>Juan Dela Cruz</option>
+                                        <option>Maria Santos</option>
+                                    </select>
+                                </div>
+                                <button
+                                    class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium text-sm">Generate
+                                    QR</button>
+                            </div>
+                            <div class="mt-6 p-8 bg-slate-50 rounded-lg flex items-center justify-center">
+                                <div class="text-center">
+                                    <i class="fas fa-qrcode text-4xl text-slate-300 mb-2"></i>
+                                    <p class="text-sm text-slate-500">QR code will appear here</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-xl border border-slate-200 overflow-hidden flex flex-col">
+                            <div class="p-6 border-b border-slate-200">
+                                <h3 class="font-semibold text-slate-900">Generated QR Codes</h3>
+                            </div>
+                            <div class="flex-1 overflow-y-auto">
+                                <div class="divide-y divide-slate-200">
+                                    <div class="p-4 hover:bg-slate-50 transition">
+                                        <p class="text-sm font-medium text-slate-900">Anna Reyes - QR001</p>
+                                        <p class="text-xs text-slate-500 mt-1">Generated: 2024-11-01</p>
+                                        <button
+                                            class="text-blue-600 text-xs font-medium mt-2 hover:underline">Download</button>
+                                    </div>
+                                    <div class="p-4 hover:bg-slate-50 transition">
+                                        <p class="text-sm font-medium text-slate-900">Juan Dela Cruz - QR002</p>
+                                        <p class="text-xs text-slate-500 mt-1">Generated: 2024-10-28</p>
+                                        <button
+                                            class="text-blue-600 text-xs font-medium mt-2 hover:underline">Download</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- USERS PAGE -->
+                <div id="users" class="page-content p-8">
+                    <div class="mb-6 flex justify-between items-center">
+                        <div>
+                            <h2 class="text-2xl font-semibold text-slate-900">User Management</h2>
+                            <p class="text-sm text-slate-500 mt-1">Manage system users and roles</p>
+                        </div>
+                        <button onclick="showAddUserModal()"
+                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium">+
+                            Add User</button>
+                    </div>
+
+                    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full" id="">
+                                <thead class="bg-slate-50 border-b border-slate-200">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold text-slate-600">Name</th>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold text-slate-600">Email</th>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold text-slate-600">Role</th>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold text-slate-600">Status</th>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold text-slate-600">Date Added
+                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold text-slate-600">Action</th>
+
+                                    </tr>
+                                </thead>
+                                <tbody id="usersTableBody">
+                                    <!-- User rows will be dynamically inserted here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SETTINGS PAGE -->
+                <div id="settings" class="page-content p-8">
+                    <div class="mb-6">
+                        <h2 class="text-2xl font-semibold text-slate-900">Settings</h2>
+                        <p class="text-sm text-slate-500 mt-1">System configuration and preferences</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                        <!-- General Settings -->
+                        <div class="bg-white rounded-xl border border-slate-200 p-6">
+                            <h3 class="font-semibold text-slate-900 mb-4">General Settings</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">Barangay Name</label>
+                                    <input type="text" value="Barangay Santiago"
+                                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">Contact Email</label>
+                                    <input type="email" value="santiago@generaltrias.ph"
+                                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                                </div>
+                                <button
+                                    class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium text-sm">Save
+                                    Changes</button>
+                            </div>
+                        </div>
+
+                        <!-- System Config -->
+                        <div class="bg-white rounded-xl border border-slate-200 p-6">
+                            <h3 class="font-semibold text-slate-900 mb-4">System Configuration</h3>
+                            <div class="space-y-3">
+                                <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                                    <p class="text-sm text-slate-700 font-medium">GPS Update Interval</p>
+                                    <select class="px-3 py-1 border border-slate-300 rounded text-xs">
+                                        <option>5s</option>
+                                        <option selected>10s</option>
+                                        <option>30s</option>
+                                    </select>
+                                </div>
+                                <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                                    <p class="text-sm text-slate-700 font-medium">Notifications</p>
+                                    <input type="checkbox" checked class="w-4 h-4 text-blue-600 rounded">
+                                </div>
+                                <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                                    <p class="text-sm text-slate-700 font-medium">Data Backup</p>
+                                    <button class="text-blue-600 text-xs font-medium hover:underline">Configure</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Arduino Configuration -->
+                    <div class="bg-white rounded-xl border border-slate-200 p-6 mb-6">
+                        <h3 class="font-semibold text-slate-900 mb-4">Arduino & GPS Configuration</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Arduino Port</label>
+                                <input type="text" value="/dev/ttyUSB0"
+                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Baud Rate</label>
+                                <input type="number" value="9600"
+                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">GPS Module</label>
+                                <input type="text" value="Neo-6M"
+                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">GSM Module</label>
+                                <input type="text" value="SIM800L"
+                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                            </div>
+                        </div>
+                        <div class="flex gap-3">
+                            <button
+                                class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium text-sm">Test
+                                Connection</button>
+                            <button
+                                class="flex-1 px-4 py-2 bg-slate-200 text-slate-900 rounded-lg hover:bg-slate-300 transition font-medium text-sm">Save
+                                Config</button>
+                        </div>
+                    </div>
+
+                    <!-- Security -->
+                    <div class="bg-white rounded-xl border border-slate-200 p-6">
+                        <h3 class="font-semibold text-slate-900 mb-4">Security & Access</h3>
+                        <div class="space-y-2">
+                            <button
+                                class="w-full text-left px-4 py-3 hover:bg-slate-50 rounded-lg transition border border-slate-200">
+                                <i class="fas fa-key text-blue-600 w-4"></i>
+                                <span class="text-sm font-medium text-slate-900 ml-2">Change Password</span>
+                            </button>
+                            <button
+                                class="w-full text-left px-4 py-3 hover:bg-slate-50 rounded-lg transition border border-slate-200">
+                                <i class="fas fa-lock text-emerald-600 w-4"></i>
+                                <span class="text-sm font-medium text-slate-900 ml-2">Two-Factor Authentication</span>
+                            </button>
+                            <button
+                                class="w-full text-left px-4 py-3 hover:bg-slate-50 rounded-lg transition border border-slate-200">
+                                <i class="fas fa-history text-amber-600 w-4"></i>
+                                <span class="text-sm font-medium text-slate-900 ml-2">Activity Log</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add User Modal -->
+                <div id="addUserModal"
+                    class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+                    <div class="bg-white rounded-xl shadow-lg max-w-md w-full mx-4 p-6">
+                        <div class="flex items-center justify-between mb-6">
+                            <h3 class="text-lg font-semibold text-slate-900">Add New User</h3>
+                            <button onclick="closeAddUserModal()" class="text-slate-500 hover:text-slate-700">
+                                <i class="fas fa-times text-xl"></i>
+                            </button>
+                        </div>
+
+                        <form id="addUserForm" onsubmit="handleAddUser(event)">
+                            <div class="space-y-4 mb-6">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">Full Name</label>
+                                    <input type="text" id="userName" name="name" required
+                                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                        placeholder="Enter full name">
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">Email</label>
+                                    <input type="email" id="userEmail" name="email" required
+                                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                        placeholder="Enter email">
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">Password</label>
+                                    <input type="password" id="userPassword" name="password" required
+                                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                        placeholder="Enter password">
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">Role</label>
+                                    <select id="userRole" name="role" required
+                                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                                        <option value="">Select a role</option>
+                                        <option value="admin">Admin</option>
+                                        <option value="health">Health Worker</option>
+                                        <option value="driver">Driver</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">Status</label>
+                                    <select id="userStatus" name="status" required
+                                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                                        <option value="active">Active</option>
+                                        <option value="inactive">Inactive</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="flex gap-3">
+                                <button type="button" onclick="closeAddUserModal()"
+                                    class="flex-1 px-4 py-2 border border-slate-300 text-slate-900 rounded-lg hover:bg-slate-50 transition font-medium text-sm">Cancel</button>
+                                <button type="submit"
+                                    class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium text-sm">Add
+                                    User</button>
+                            </div>
+
+                            <div id="addFormMessage" class="mt-4 p-3 rounded-lg hidden"></div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- START: NEW Edit User Modal -->
+                <div id="editUserModal"
+                    class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+                    <div class="bg-white rounded-xl shadow-lg max-w-md w-full mx-4 p-6">
+                        <div class="flex items-center justify-between mb-6">
+                            <h3 class="text-lg font-semibold text-slate-900">Edit User</h3>
+                            <button onclick="closeEditUserModal()" class="text-slate-500 hover:text-slate-700">
+                                <i class="fas fa-times text-xl"></i>
+                            </button>
+                        </div>
+
+                        <form id="editUserForm" onsubmit="handleEditUser(event)">
+                            <!-- Hidden input to store user ID -->
+                            <input type="hidden" id="editUserId" name="id">
+
+                            <div class="space-y-4 mb-6">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">Full Name</label>
+                                    <input type="text" id="editUserName" name="name" required
+                                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                        placeholder="Enter full name">
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">Email</label>
+                                    <input type="email" id="editUserEmail" name="email" required
+                                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                        placeholder="Enter email">
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">Password</label>
+                                    <input type="password" id="editUserPassword" name="password"
+                                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                        placeholder="Leave blank to keep password">
+                                    <p class="text-xs text-slate-500 mt-1">Leave blank to keep current password.</p>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">Role</label>
+                                    <select id="editUserRole" name="role" required
+                                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                                        <option value="">Select a role</option>
+                                        <option value="admin">Admin</option>
+                                        <option value="health">Health Worker</option>
+                                        <option value="driver">Driver</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">Status</label>
+                                    <select id="editUserStatus" name="status" required
+                                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                                        <option value="active">Active</option>
+                                        <option value="inactive">Inactive</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="flex gap-3">
+                                <button type="button" onclick="closeEditUserModal()"
+                                    class="flex-1 px-4 py-2 border border-slate-300 text-slate-900 rounded-lg hover:bg-slate-50 transition font-medium text-sm">Cancel</button>
+                                <button type="submit"
+                                    class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium text-sm">Save
+                                    Changes</button>
+                            </div>
+
+                            <div id="editFormMessage" class="mt-4 p-3 rounded-lg hidden"></div>
+                        </form>
+                    </div>
+                </div>
+                <!-- END: NEW Edit User Modal -->
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js" defer></script>
+
+</body>
+
+</html>
